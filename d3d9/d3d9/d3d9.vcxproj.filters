@@ -1,0 +1,63 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="HMDInterface.cpp" />
+    <ClCompile Include="OpenVRDirectMode.cpp" />
+    <ClCompile Include="Direct3D9ExWrapper.cpp">
+      <Filter>Wrapper</Filter>
+    </ClCompile>
+    <ClCompile Include="Direct3D9ExProxyImpl.cpp">
+      <Filter>ProxyImpl</Filter>
+    </ClCompile>
+    <ClCompile Include="Direct3DDevice9ExWrapper.cpp">
+      <Filter>Wrapper</Filter>
+    </ClCompile>
+    <ClCompile Include="Direct3DDevice9ExProxyImpl.cpp">
+      <Filter>ProxyImpl</Filter>
+    </ClCompile>
+    <ClCompile Include="D3D9DllHook.cpp" />
+    <ClCompile Include="jsoncpp-0.y.z\jsoncpp.cpp">
+      <Filter>jsoncpp-0.y.z</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="OpenVRDirectMode.h" />
+    <ClInclude Include="Main.h" />
+    <ClInclude Include="HMDInterface.h" />
+    <ClInclude Include="Direct3D9ExWrapper.h">
+      <Filter>Wrapper</Filter>
+    </ClInclude>
+    <ClInclude Include="Direct3D9ExProxyImpl.h">
+      <Filter>ProxyImpl</Filter>
+    </ClInclude>
+    <ClInclude Include="Direct3DDevice9ExWrapper.h">
+      <Filter>Wrapper</Filter>
+    </ClInclude>
+    <ClInclude Include="Direct3DDevice9ExProxyImpl.h">
+      <Filter>ProxyImpl</Filter>
+    </ClInclude>
+    <ClInclude Include="hmdWrapper.h">
+      <Filter>External Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="stCommon.h">
+      <Filter>External Headers</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Exports.def" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Wrapper">
+      <UniqueIdentifier>{098f7155-0228-4306-8c76-b38e3157fafa}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ProxyImpl">
+      <UniqueIdentifier>{2a2120c1-6bb1-49c9-9fcb-43672b191681}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="External Headers">
+      <UniqueIdentifier>{340c52a2-d272-43b2-aba1-4541b05e0a93}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="jsoncpp-0.y.z">
+      <UniqueIdentifier>{2e6cb2b1-2651-4cda-9155-6baf2b15bc3c}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
