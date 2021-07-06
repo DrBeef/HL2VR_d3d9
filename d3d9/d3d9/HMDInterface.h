@@ -16,6 +16,8 @@ public:
 
 	virtual bool Init(IDirect3DDevice9Ex* pDevice) = 0;
 
+	virtual std::string  GetAPI() = 0;
+
 	//Rendering Stuff
 	virtual void Submit() = 0;
 	virtual void GetRecommendedRenderTargetSize(uint32_t *pnWidth, uint32_t *pnHeight) = 0;

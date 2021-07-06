@@ -16,21 +16,18 @@ struct IDirect3DDevice9Ex;
 
 struct SharedTextureHolder {
 	SharedTextureHolder() :
-		m_d3d11Texture(NULL),
-		m_d3d9Texture(NULL) {}
+		m_d3d11Texture(NULL) {}
 
 	void Release() {
 		if (m_d3d11Texture != NULL)
 		{
 			m_d3d11Texture->Release();
 			m_d3d11Texture = NULL;
-			m_d3d9Texture->Release();
-			m_d3d9Texture = NULL;
 		}
 	}
 
+	vr::VRVulkanTextureData_t m_VulkanData;
 	ID3D11Texture2D*        m_d3d11Texture;
-	IDirect3DTexture9*      m_d3d9Texture;
 	vr::Texture_t			m_VRTexture;
 };
 
@@ -49,6 +46,8 @@ public:
 	virtual ~OpenVRDirectMode();
 
 	virtual bool Init(IDirect3DDevice9Ex* pDevice);	
+
+	virtual std::string  GetAPI();
 
 	//Rendering Stuff
 	virtual void Submit();
@@ -102,6 +101,7 @@ private:
 	bool m_hasHMDAttached;
 	bool m_useControllerState;
 	bool m_submitFrameBuffersToCompositor;
+	std::string m_api;
 
 	ButtonState m_buttonStates[ButtonsList::right_GestureFist + 1];
 	ButtonState m_previousButtonStates[ButtonsList::right_GestureFist + 1];

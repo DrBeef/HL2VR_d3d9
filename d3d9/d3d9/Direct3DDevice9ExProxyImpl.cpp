@@ -51,6 +51,13 @@ HRESULT WINAPI Direct3DDevice9ExProxyImpl::CreateTexture(UINT Width,UINT Height,
 	{
 		index = Width - MAGIC_WIDTH;
 
+		if (hmdInterface->GetAPI() == "vulkan")
+		{
+			shared_handle = new vr::VRVulkanTextureData_t();
+			memset(shared_handle, 0, sizeof(vr::VRVulkanTextureData_t));
+		}
+
+
 		pSharedHandle = &shared_handle;
 
 		uint32_t width, height;
@@ -59,12 +66,23 @@ HRESULT WINAPI Direct3DDevice9ExProxyImpl::CreateTexture(UINT Width,UINT Height,
 		Width = width * 2;
 		Height = height;
 	}
+	else
+	{
+		pSharedHandle = NULL;
+	}
 
 	HRESULT creationResult = Direct3DDevice9ExWrapper::CreateTexture(Width, Height, Levels, Usage, Format, Pool, ppTexture, pSharedHandle);
 
 	if (index != -1)
 	{
 		hmdInterface->StoreSharedTexture(index, *ppTexture, pSharedHandle);
+
+		//Clean up allocated memory
+		if (hmdInterface->GetAPI() == "vulkan")
+		{
+			vr::VRVulkanTextureData_t *p = (vr::VRVulkanTextureData_t*)(*pSharedHandle);
+			delete p;
+		}
 	}
 
 	return creationResult;

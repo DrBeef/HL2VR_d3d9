@@ -107,6 +107,7 @@ bool OpenVRDirectMode::Init(IDirect3DDevice9Ex* pActualDevice)
 	//Get whether we use controller tracking from the properties json
 	m_useControllerState = GetBoolProperty("useControllerState", m_useControllerState);
 	m_submitFrameBuffersToCompositor = GetBoolProperty("submitFrameBuffersToCompositor", m_submitFrameBuffersToCompositor);
+	m_api = GetStringProperty("api", "vulkan");
 
 	m_pHMD->GetRecommendedRenderTargetSize(&m_nRenderWidth, &m_nRenderHeight);
 
@@ -124,12 +125,15 @@ bool OpenVRDirectMode::Init(IDirect3DDevice9Ex* pActualDevice)
 		return false;
 	}
 
-	HRESULT errorCode = D3D11CreateDevice(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, 0,
-		NULL, NULL, D3D11_SDK_VERSION, &m_pID3D11Device, NULL, NULL);
-
-	if (FAILED(errorCode))
+	if (m_api == "DX11")
 	{
-		return false;
+		HRESULT errorCode = D3D11CreateDevice(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, 0,
+			NULL, NULL, D3D11_SDK_VERSION, &m_pID3D11Device, NULL, NULL);
+
+		if (FAILED(errorCode))
+		{
+			return false;
+		}
 	}
 
 	m_initialised = true;
@@ -137,6 +141,10 @@ bool OpenVRDirectMode::Init(IDirect3DDevice9Ex* pActualDevice)
 	return true;
 }
 
+std::string  OpenVRDirectMode::GetAPI()
+{
+	return m_api;
+}
 
 void OpenVRDirectMode::Submit()
 {
@@ -148,6 +156,7 @@ void OpenVRDirectMode::Submit()
 	static vr::VRTextureBounds_t leftBounds = { 0.0f, 0.0f, 0.5f, 1.0f };
 	static vr::VRTextureBounds_t rightBounds = { 0.5f, 0.0f, 1.0f, 1.0f };
 
+	if (m_api == "DX11")
 	{
 		//Wait for the work to finish
 		IDirect3DQuery9* pEventQuery = nullptr;
@@ -396,26 +405,33 @@ void OpenVRDirectMode::StoreSharedTexture(int index, IDirect3DTexture9* pIDirect
 
 	if (m_hasHMDAttached)
 	{
-		ID3D11Resource* pID3D11Resource = NULL;
-		if (SUCCEEDED(m_pID3D11Device->OpenSharedResource(*pShared, __uuidof(ID3D11Resource), (void**)&pID3D11Resource)))
+		if (m_api == "DX11")
 		{
-			ID3D11Texture2D *pID3D11Texture2D = NULL;
-			if (SUCCEEDED(pID3D11Resource->QueryInterface(__uuidof(ID3D11Texture2D), (void**)&pID3D11Texture2D)))
+			ID3D11Resource* pID3D11Resource = NULL;
+			if (SUCCEEDED(m_pID3D11Device->OpenSharedResource(*pShared, __uuidof(ID3D11Resource), (void**)&pID3D11Resource)))
 			{
-				//DX9 Texture
-				m_SharedTextureHolder[m_nextStoredexture].m_d3d9Texture = pIDirect3DTexture9;
-				pIDirect3DTexture9->AddRef();
+				ID3D11Texture2D *pID3D11Texture2D = NULL;
+				if (SUCCEEDED(pID3D11Resource->QueryInterface(__uuidof(ID3D11Texture2D), (void**)&pID3D11Texture2D)))
+				{
+					//DX11 2D Surface - The QI above would have increased the ref count for this
+					m_SharedTextureHolder[m_nextStoredexture].m_d3d11Texture = pID3D11Texture2D;
 
-				//DX11 2D Surface - The QI above would have increased the ref count for this
-				m_SharedTextureHolder[m_nextStoredexture].m_d3d11Texture = pID3D11Texture2D;
+					//Open VR Texture
+					m_SharedTextureHolder[m_nextStoredexture].m_VRTexture.handle = pID3D11Texture2D;
+					m_SharedTextureHolder[m_nextStoredexture].m_VRTexture.eColorSpace = vr::ColorSpace_Auto;
+					m_SharedTextureHolder[m_nextStoredexture].m_VRTexture.eType = vr::TextureType_DirectX;
+				}
 
-				//Open VR Texture
-				m_SharedTextureHolder[m_nextStoredexture].m_VRTexture.handle = pID3D11Texture2D;
-				m_SharedTextureHolder[m_nextStoredexture].m_VRTexture.eColorSpace = vr::ColorSpace_Auto;
-				m_SharedTextureHolder[m_nextStoredexture].m_VRTexture.eType = vr::TextureType_DirectX;
+				pID3D11Resource->Release();
 			}
+		}
+		else if (m_api == "vulkan")
+		{
+			memcpy(&m_SharedTextureHolder[m_nextStoredexture].m_VulkanData, *pShared, sizeof(vr::VRVulkanTextureData_t));
 
-			pID3D11Resource->Release();
+			m_SharedTextureHolder[m_nextStoredexture].m_VRTexture.handle = &m_SharedTextureHolder[m_nextStoredexture].m_VulkanData;
+			m_SharedTextureHolder[m_nextStoredexture].m_VRTexture.eColorSpace = vr::ColorSpace_Auto;
+			m_SharedTextureHolder[m_nextStoredexture].m_VRTexture.eType = vr::TextureType_Vulkan;
 		}
 	}
 }
