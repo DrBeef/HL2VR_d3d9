@@ -21,7 +21,11 @@ Direct3DDevice9ExProxyImpl::~Direct3DDevice9ExProxyImpl()
 HRESULT WINAPI Direct3DDevice9ExProxyImpl::Present(CONST RECT* pSourceRect,CONST RECT* pDestRect,HWND hDestWindowOverride,CONST RGNDATA* pDirtyRegion)
 {
 	HRESULT hr = S_OK;
-	hr =  Direct3DDevice9ExWrapper::PresentEx(pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion,  0);	
+
+	if (hmdInterface)
+		hmdInterface->PrePresent();
+
+	hr =  Direct3DDevice9ExWrapper::PresentEx(pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion,  0);
 
 	if (hmdInterface)
 		hmdInterface->Submit();
@@ -33,6 +37,10 @@ HRESULT WINAPI Direct3DDevice9ExProxyImpl::Present(CONST RECT* pSourceRect,CONST
 HRESULT WINAPI Direct3DDevice9ExProxyImpl::PresentEx(CONST RECT* pSourceRect,CONST RECT* pDestRect,HWND hDestWindowOverride,CONST RGNDATA* pDirtyRegion, DWORD flags)
 {
 	HRESULT hr = S_OK;
+
+	if (hmdInterface)
+		hmdInterface->PrePresent();
+
 	hr = Direct3DDevice9ExWrapper::PresentEx(pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion, flags);
 	
 	if (hmdInterface)
@@ -49,29 +57,34 @@ HRESULT WINAPI Direct3DDevice9ExProxyImpl::CreateTexture(UINT Width,UINT Height,
 	int index = -1;
 	if (Width >= MAGIC_WIDTH)
 	{
+		uint32_t rtWidth, rtHeight;
+		hmdInterface->GetRecommendedRenderTargetSize(&rtWidth, &rtHeight);
+
+		//Double width for both eyes
+		rtWidth *= 2;
+
 		if (GetBoolProperty("acquireSharedTextures", true))
 		{
 			index = Width - MAGIC_WIDTH;
 
 			if (hmdInterface->GetAPI() == "vulkan")
 			{
-				shared_handle = new vr::VRVulkanTextureData_t();
-				memset(shared_handle, 0, sizeof(vr::VRVulkanTextureData_t));
+				vr::VRVulkanTextureData_t *pVRVulkanTextureData_t = new vr::VRVulkanTextureData_t();
+				memset(pVRVulkanTextureData_t, 0, sizeof(vr::VRVulkanTextureData_t));
+
+				//Set these here to indicate to DXVK this is a texture data object (a little hacky, but does the trick)
+				pVRVulkanTextureData_t->m_nHeight = rtHeight;
+				pVRVulkanTextureData_t->m_nWidth = rtWidth;
+
+				shared_handle = pVRVulkanTextureData_t;
 			}
 
 			pSharedHandle = &shared_handle;
 		}
 
-
-		uint32_t width, height;
-		hmdInterface->GetRecommendedRenderTargetSize(&width, &height);
-
-		Width = width * 2;
-		Height = height;
-	}
-	else
-	{
-		pSharedHandle = NULL;
+		//Update to actual render target size 
+		Width = rtWidth;
+		Height = rtHeight;
 	}
 
 	HRESULT creationResult = Direct3DDevice9ExWrapper::CreateTexture(Width, Height, Levels, Usage, Format, Pool, ppTexture, pSharedHandle);

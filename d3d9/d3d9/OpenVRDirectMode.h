@@ -54,6 +54,7 @@ public:
 	virtual std::string  GetAPI();
 
 	//Rendering Stuff
+	virtual void PrePresent();
 	virtual void Submit();
 	virtual void GetRecommendedRenderTargetSize(uint32_t *pnWidth, uint32_t *pnHeight);
 	virtual float GetEyeDistance();
@@ -100,8 +101,9 @@ private:
 
 private:
 	bool m_initialised;
-	int m_nextStoredexture;
+	int m_nextStoredTexture;
 	int m_currentRenderTexture;
+	int m_lastSubmittedTexture;
 	bool m_hasHMDAttached;
 
 	ButtonState m_buttonStates[ButtonsList::right_GestureFist + 1];

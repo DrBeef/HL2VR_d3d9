@@ -52,8 +52,9 @@ void MatrixTranspose(float src[4][4], float dst[4][4])
 OpenVRDirectMode::OpenVRDirectMode() : 
 	m_pHMD(NULL),
 	m_initialised(false),
-	m_nextStoredexture(0),
+	m_nextStoredTexture(0),
 	m_currentRenderTexture(0),
+	m_lastSubmittedTexture(-1),
 	m_hasHMDAttached(true)
 {
 	DEBUG_LOG("OpenVRDirectMode::OpenVRDirectMode()");
@@ -126,6 +127,10 @@ bool OpenVRDirectMode::Init(IDirect3DDevice9Ex* pActualDevice)
 			return false;
 		}
 	}
+	else if (GetAPI() == "vulkan")
+	{
+		vr::VRCompositor()->SetExplicitTimingMode(vr::VRCompositorTimingMode_Explicit_ApplicationPerformsPostPresentHandoff);
+	}
 
 	m_initialised = true;
 
@@ -137,6 +142,24 @@ std::string  OpenVRDirectMode::GetAPI()
 	static auto api = GetStringProperty("api", "vulkan");
 	return api;
 }
+
+void OpenVRDirectMode::PrePresent()
+{
+	if (!m_initialised)
+	{
+		return;
+	}
+
+	if (GetAPI() == "vulkan")
+	{
+		vr::EVRCompositorError error = vr::VRCompositor()->SubmitExplicitTimingData();
+		if (error != vr::VRCompositorError_None)
+		{
+			OutputDebugString("Error - SubmitExplicitTimingData failed\n");
+		}
+	}
+}
+
 
 void OpenVRDirectMode::Submit()
 {
@@ -161,23 +184,29 @@ void OpenVRDirectMode::Submit()
 		}
 	}
 
-	if (m_hasHMDAttached && GetBoolProperty("submitFrameBuffersToCompositor", true))
+	if (m_hasHMDAttached && 
+		GetBoolProperty("submitFrameBuffersToCompositor", true) &&
+		m_lastSubmittedTexture != m_currentRenderTexture)
 	{
 		vr::EVRCompositorError error = vr::VRCompositor()->Submit(vr::Eye_Left, &(m_SharedTextureHolder[m_currentRenderTexture].m_VRTexture), &leftBounds);
 		if (error != vr::VRCompositorError_None)
 		{
-			OutputDebugString("Error - Could not submit compositor left eye texture");
+			OutputDebugString("Error - Could not submit compositor left eye texture\n");
 		}
 
 		error = vr::VRCompositor()->Submit(vr::Eye_Right, &(m_SharedTextureHolder[m_currentRenderTexture].m_VRTexture), &rightBounds);
 		if (error != vr::VRCompositorError_None)
 		{
-			OutputDebugString("Error - Could not submit compositor left eye texture");
+			OutputDebugString("Error - Could not submit compositor right eye texture\n");
 		}
+
+		vr::VRCompositor()->PostPresentHandoff();
+
+		m_lastSubmittedTexture = m_currentRenderTexture;
 	}
 
 	//Move to the next texture
-	if (++m_currentRenderTexture > m_nextStoredexture)
+	if (++m_currentRenderTexture > m_nextStoredTexture)
 	{
 		m_currentRenderTexture = 0;
 	}
@@ -389,10 +418,10 @@ void OpenVRDirectMode::StoreSharedTexture(int index, IDirect3DTexture9* pIDirect
 		return;
 	}
 
-	m_nextStoredexture = index;
+	m_nextStoredTexture = index;
 
 	//Ensure this is empty before proceeding
-	m_SharedTextureHolder[m_nextStoredexture].Release();
+	m_SharedTextureHolder[m_nextStoredTexture].Release();
 
 	if (m_hasHMDAttached)
 	{
@@ -405,16 +434,16 @@ void OpenVRDirectMode::StoreSharedTexture(int index, IDirect3DTexture9* pIDirect
 				if (SUCCEEDED(pID3D11Resource->QueryInterface(__uuidof(ID3D11Texture2D), (void**)&pID3D11Texture2D)))
 				{
 					//DX11 2D Surface - The QI above would have increased the ref count for this
-					m_SharedTextureHolder[m_nextStoredexture].m_d3d11Texture = pID3D11Texture2D;
+					m_SharedTextureHolder[m_nextStoredTexture].m_d3d11Texture = pID3D11Texture2D;
 
 					//DX9 Texture
-					m_SharedTextureHolder[m_nextStoredexture].m_d3d9Texture = pIDirect3DTexture9;
+					m_SharedTextureHolder[m_nextStoredTexture].m_d3d9Texture = pIDirect3DTexture9;
 					pIDirect3DTexture9->AddRef();
 
 					//Open VR Texture
-					m_SharedTextureHolder[m_nextStoredexture].m_VRTexture.handle = pID3D11Texture2D;
-					m_SharedTextureHolder[m_nextStoredexture].m_VRTexture.eColorSpace = vr::ColorSpace_Auto;
-					m_SharedTextureHolder[m_nextStoredexture].m_VRTexture.eType = vr::TextureType_DirectX;
+					m_SharedTextureHolder[m_nextStoredTexture].m_VRTexture.handle = pID3D11Texture2D;
+					m_SharedTextureHolder[m_nextStoredTexture].m_VRTexture.eColorSpace = vr::ColorSpace_Auto;
+					m_SharedTextureHolder[m_nextStoredTexture].m_VRTexture.eType = vr::TextureType_DirectX;
 				}
 
 				pID3D11Resource->Release();
@@ -422,11 +451,11 @@ void OpenVRDirectMode::StoreSharedTexture(int index, IDirect3DTexture9* pIDirect
 		}
 		else if (GetAPI() == "vulkan")
 		{
-			memcpy(&m_SharedTextureHolder[m_nextStoredexture].m_VulkanData, *pShared, sizeof(vr::VRVulkanTextureData_t));
+			memcpy(&m_SharedTextureHolder[m_nextStoredTexture].m_VulkanData, *pShared, sizeof(vr::VRVulkanTextureData_t));
 
-			m_SharedTextureHolder[m_nextStoredexture].m_VRTexture.handle = &m_SharedTextureHolder[m_nextStoredexture].m_VulkanData;
-			m_SharedTextureHolder[m_nextStoredexture].m_VRTexture.eColorSpace = vr::ColorSpace_Auto;
-			m_SharedTextureHolder[m_nextStoredexture].m_VRTexture.eType = vr::TextureType_Vulkan;
+			m_SharedTextureHolder[m_nextStoredTexture].m_VRTexture.handle = &m_SharedTextureHolder[m_nextStoredTexture].m_VulkanData;
+			m_SharedTextureHolder[m_nextStoredTexture].m_VRTexture.eColorSpace = vr::ColorSpace_Auto;
+			m_SharedTextureHolder[m_nextStoredTexture].m_VRTexture.eType = vr::TextureType_Vulkan;
 		}
 	}
 }
@@ -439,7 +468,7 @@ int OpenVRDirectMode::GetCurrentRenderTexture()
 
 int OpenVRDirectMode::GetTotalStoredTextures()
 {
-	return m_nextStoredexture;
+	return m_nextStoredTexture;
 }
 
 
