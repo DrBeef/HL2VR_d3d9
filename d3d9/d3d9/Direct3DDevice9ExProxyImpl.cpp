@@ -49,16 +49,19 @@ HRESULT WINAPI Direct3DDevice9ExProxyImpl::CreateTexture(UINT Width,UINT Height,
 	int index = -1;
 	if (Width >= MAGIC_WIDTH)
 	{
-		index = Width - MAGIC_WIDTH;
-
-		if (hmdInterface->GetAPI() == "vulkan")
+		if (GetBoolProperty("acquireSharedTextures", true))
 		{
-			shared_handle = new vr::VRVulkanTextureData_t();
-			memset(shared_handle, 0, sizeof(vr::VRVulkanTextureData_t));
+			index = Width - MAGIC_WIDTH;
+
+			if (hmdInterface->GetAPI() == "vulkan")
+			{
+				shared_handle = new vr::VRVulkanTextureData_t();
+				memset(shared_handle, 0, sizeof(vr::VRVulkanTextureData_t));
+			}
+
+			pSharedHandle = &shared_handle;
 		}
 
-
-		pSharedHandle = &shared_handle;
 
 		uint32_t width, height;
 		hmdInterface->GetRecommendedRenderTargetSize(&width, &height);
