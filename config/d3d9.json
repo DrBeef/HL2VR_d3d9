@@ -1,5 +1,8 @@
 {
-	"useNextDll": "",
+	"comment": "Values prefixed with XXX are commented out and won't be used",
+	"api": "DX11",
+	"XXXuseNextDll": "d3d9_dxvk_vr.dll",
+	"acquireSharedTextures": true,
 	"submitFrameBuffersToCompositor": true,
 	"useControllerState": true
 }

@@ -55,7 +55,7 @@ OpenVRDirectMode::OpenVRDirectMode() :
 	m_nextStoredTexture(0),
 	m_currentRenderTexture(0),
 	m_lastSubmittedTexture(-1),
-	m_hasHMDAttached(true)
+	m_hasHMDAttached(false)
 {
 	DEBUG_LOG("OpenVRDirectMode::OpenVRDirectMode()");
 
@@ -84,7 +84,7 @@ bool OpenVRDirectMode::Init(IDirect3DDevice9Ex* pActualDevice)
 	{
 		if (eError == vr::VRInitError_Init_HmdNotFound)
 		{
-			m_hasHMDAttached = false;
+			
 			m_initialised = true;
 			m_nRenderWidth = m_nRenderHeight = 2016;
 			return true;
@@ -101,15 +101,9 @@ bool OpenVRDirectMode::Init(IDirect3DDevice9Ex* pActualDevice)
 		return false;
 	}
 
-	m_pHMD->GetRecommendedRenderTargetSize(&m_nRenderWidth, &m_nRenderHeight);
+	m_hasHMDAttached = true;
 
-	m_pRenderModels = (vr::IVRRenderModels *)vr::VR_GetGenericInterface(vr::IVRRenderModels_Version, &eError);
-	if (!m_pRenderModels)
-	{
-		m_pHMD = NULL;
-		vr::VR_Shutdown();
-		return false; 
-	}
+	m_pHMD->GetRecommendedRenderTargetSize(&m_nRenderWidth, &m_nRenderHeight);
 
 	if (!vr::VRCompositor())
 	{
@@ -152,10 +146,13 @@ void OpenVRDirectMode::PrePresent()
 
 	if (GetAPI() == "vulkan")
 	{
-		vr::EVRCompositorError error = vr::VRCompositor()->SubmitExplicitTimingData();
-		if (error != vr::VRCompositorError_None)
+		if (vr::VRCompositor())
 		{
-			OutputDebugString("Error - SubmitExplicitTimingData failed\n");
+			vr::EVRCompositorError error = vr::VRCompositor()->SubmitExplicitTimingData();
+			if (error != vr::VRCompositorError_None)
+			{
+				OutputDebugString("Error - SubmitExplicitTimingData failed\n");
+			}
 		}
 	}
 }
@@ -184,23 +181,30 @@ void OpenVRDirectMode::Submit()
 		}
 	}
 
+
 	if (m_hasHMDAttached && 
 		GetBoolProperty("submitFrameBuffersToCompositor", true) &&
-		m_lastSubmittedTexture != m_currentRenderTexture)
+		(
+			m_lastSubmittedTexture != m_currentRenderTexture ||
+			GetTotalStoredTextures() == 1
+			))
 	{
-		vr::EVRCompositorError error = vr::VRCompositor()->Submit(vr::Eye_Left, &(m_SharedTextureHolder[m_currentRenderTexture].m_VRTexture), &leftBounds);
-		if (error != vr::VRCompositorError_None)
+		if (vr::VRCompositor())
 		{
-			OutputDebugString("Error - Could not submit compositor left eye texture\n");
-		}
+			vr::EVRCompositorError error = vr::VRCompositor()->Submit(vr::Eye_Left, &(m_SharedTextureHolder[m_currentRenderTexture].m_VRTexture), &leftBounds);
+			if (error != vr::VRCompositorError_None)
+			{
+				OutputDebugString("Error - Could not submit compositor left eye texture\n");
+			}
 
-		error = vr::VRCompositor()->Submit(vr::Eye_Right, &(m_SharedTextureHolder[m_currentRenderTexture].m_VRTexture), &rightBounds);
-		if (error != vr::VRCompositorError_None)
-		{
-			OutputDebugString("Error - Could not submit compositor right eye texture\n");
-		}
+			error = vr::VRCompositor()->Submit(vr::Eye_Right, &(m_SharedTextureHolder[m_currentRenderTexture].m_VRTexture), &rightBounds);
+			if (error != vr::VRCompositorError_None)
+			{
+				OutputDebugString("Error - Could not submit compositor right eye texture\n");
+			}
 
-		vr::VRCompositor()->PostPresentHandoff();
+			vr::VRCompositor()->PostPresentHandoff();
+		}
 
 		m_lastSubmittedTexture = m_currentRenderTexture;
 	}
@@ -468,7 +472,7 @@ int OpenVRDirectMode::GetCurrentRenderTexture()
 
 int OpenVRDirectMode::GetTotalStoredTextures()
 {
-	return m_nextStoredTexture;
+	return m_nextStoredTexture+1;
 }
 
 
