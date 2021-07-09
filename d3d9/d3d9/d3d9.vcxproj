@@ -73,7 +73,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
     <TargetName>d3d9</TargetName>
-    <PostBuildEventUseInBuild>true</PostBuildEventUseInBuild>
+    <PostBuildEventUseInBuild>false</PostBuildEventUseInBuild>
     <IncludePath>$(WIN_DDK_DIR)inc\atl71;$(VCInstallDir)include;$(VCInstallDir)atlmfc\include;$(WindowsSDK_IncludePath);</IncludePath>
     <LibraryPath>$(WIN_DDK_DIR)\lib\ATL\i386;$(VCInstallDir)lib;$(VCInstallDir)atlmfc\lib;$(WindowsSDK_LibraryPath_x86);</LibraryPath>
     <PreBuildEventUseInBuild>false</PreBuildEventUseInBuild>
@@ -242,6 +242,8 @@ copy /Y "$(OutDir)$(TargetName).lib" "E:\HLVR_old_source-master\src\lib\public\$
     <ClCompile Include="Direct3D9ExWrapper.cpp" />
     <ClCompile Include="Direct3DDevice9ExWrapper.cpp" />
     <ClCompile Include="D3D9DllHook.cpp" />
+    <ClCompile Include="glad.c" />
+    <ClCompile Include="glad_wgl.c" />
     <ClCompile Include="HMDInterface.cpp" />
     <ClCompile Include="jsoncpp-0.y.z\jsoncpp.cpp" />
     <ClCompile Include="OpenVRDirectMode.cpp" />

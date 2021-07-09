@@ -5,9 +5,14 @@
 #include "Direct3DDevice9ExProxyImpl.h"
 #include <DirectXMath.h>
 
+#include "glad/glad.h"
+#include "glad/glad_wgl.h"
 
 #pragma comment (lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
+#pragma comment(lib, "opengl32.lib")
+#pragma comment(lib, "gdi32.lib")
+#pragma comment(lib, "user32.lib")
 #pragma comment (lib, "OpenVRHelpers\\openvr_api.lib")
 #pragma warning (disable : 4305)
 
@@ -50,6 +55,9 @@ void MatrixTranspose(float src[4][4], float dst[4][4])
 * Constructor.
 ***/ 
 OpenVRDirectMode::OpenVRDirectMode() : 
+	m_glDC(nullptr),
+	m_glContext(nullptr),
+	m_glDXDevice(nullptr),
 	m_pHMD(NULL),
 	m_initialised(false),
 	m_nextStoredTexture(0),
@@ -67,6 +75,11 @@ OpenVRDirectMode::OpenVRDirectMode() :
 OpenVRDirectMode::~OpenVRDirectMode()
 {
 	DEBUG_LOG("OpenVRDirectMode::~OpenVRDirectMode()");
+	if (m_initialised && m_glContext) {
+		wglDXCloseDeviceNV(m_glDXDevice);
+		wglMakeCurrent(NULL, NULL);
+		wglDeleteContext(m_glContext);
+	}
 }
 
 
@@ -120,6 +133,44 @@ bool OpenVRDirectMode::Init(IDirect3DDevice9Ex* pActualDevice)
 			return false;
 		}
 	}
+	else if (GetAPI() == "opengl") 
+	{
+		D3DDEVICE_CREATION_PARAMETERS params;
+		m_pActualDevice->GetCreationParameters(&params);
+		m_glDC = GetDC(params.hFocusWindow);
+		PIXELFORMATDESCRIPTOR pfd = {
+			sizeof(PIXELFORMATDESCRIPTOR),
+			1,
+			PFD_SUPPORT_OPENGL|PFD_DRAW_TO_WINDOW|PFD_DOUBLEBUFFER_DONTCARE,
+			PFD_TYPE_RGBA,
+			32,
+			0, 0, 0, 0, 0, 0,
+			0, 0,
+			0, 0, 0, 0, 0,
+			24, 8, 0,
+			PFD_MAIN_PLANE,
+			0, 0, 0, 0
+		};
+		int pixelFormat = ChoosePixelFormat(m_glDC, &pfd);
+		SetPixelFormat(m_glDC, pixelFormat, &pfd);
+		HGLRC m_glContext = wglCreateContext(m_glDC);
+		if (!m_glContext) {
+			OutputDebugString("ERROR: Could not create GL context\n");
+			return false;
+		}
+
+		wglMakeCurrent(m_glDC, m_glContext);
+		if (!gladLoadWGL(m_glDC) || !gladLoadGL()) {
+			OutputDebugString("ERROR: Could not initialize GLAD\n");
+			return false;
+		}
+
+		m_glDXDevice = wglDXOpenDeviceNV(m_pActualDevice);
+		if (!m_glDXDevice) {
+			OutputDebugString("ERROR: Could not open DX device for GL sharing\n");
+			return false;
+		}
+	}
 
 	m_initialised = true;
 
@@ -154,6 +205,53 @@ void OpenVRDirectMode::Submit()
 			pEventQuery->Issue(D3DISSUE_END);
 			while (pEventQuery->GetData(nullptr, 0, D3DGETDATA_FLUSH) != S_OK);
 			pEventQuery->Release();
+		}
+	}
+
+	if (GetAPI() == "opengl")
+	{
+		if (m_SharedTextureHolder[m_currentRenderTexture].m_glSharedHandle)
+		{
+			int error = 0;
+			wglDXLockObjectsNV(m_glDXDevice, 1, &m_SharedTextureHolder[m_currentRenderTexture].m_glSharedHandle);
+
+			glBindFramebuffer(GL_FRAMEBUFFER, m_SharedTextureHolder[m_currentRenderTexture].m_glFBO[1]);
+			error = glGetError();
+			GLuint width = m_SharedTextureHolder[m_currentRenderTexture].m_Width;
+			GLuint height = m_SharedTextureHolder[m_currentRenderTexture].m_Height;
+			glViewport(0, 0, width, height);
+			error = glGetError();
+			glMatrixMode(GL_PROJECTION);
+			error = glGetError();
+			glLoadIdentity();
+			error = glGetError();
+			glOrtho(0, width, height, 0, -1, 1);
+			error = glGetError();
+			glDisable(GL_DEPTH_TEST);
+			error = glGetError();
+			glMatrixMode(GL_MODELVIEW);
+			error = glGetError();
+			glLoadIdentity();
+			error = glGetError();
+			glEnable(GL_TEXTURE_2D);
+			error = glGetError();
+			glActiveTexture(GL_TEXTURE0);
+			error = glGetError();
+			glBindTexture(GL_TEXTURE_2D, m_SharedTextureHolder[m_currentRenderTexture].m_glTexture[0]);
+			error = glGetError();
+			glPushMatrix();
+			error = glGetError();
+			glBegin(GL_QUADS);
+			glTexCoord2d(0, 0); glVertex2f(0, 0);
+			glTexCoord2d(0, 1); glVertex2f(0, height);
+			glTexCoord2d(1, 1); glVertex2f(width, height);
+			glTexCoord2d(1, 0); glVertex2f(width, 0);
+			glEnd();
+			error = glGetError();
+			glPopMatrix();
+			error = glGetError();
+			
+			wglDXUnlockObjectsNV(m_glDXDevice, 1, &m_SharedTextureHolder[m_currentRenderTexture].m_glSharedHandle);
 		}
 	}
 
@@ -428,6 +526,41 @@ void OpenVRDirectMode::StoreSharedTexture(int index, IDirect3DTexture9* pIDirect
 				pID3D11Resource->Release();
 			}
 		}
+		}
+		else if (GetAPI() == "opengl")
+		{
+			SharedTextureHolder &th = m_SharedTextureHolder[m_nextStoredTexture];
+			glGenTextures(2, th.m_glTexture);
+			glGenFramebuffers(2, th.m_glFBO);
+
+			// get shared texture handle from DX texture
+			wglDXSetResourceShareHandleNV(pIDirect3DTexture9, *pShared);
+			th.m_glSharedHandle = wglDXRegisterObjectNV(m_glDXDevice, pIDirect3DTexture9, th.m_glTexture[0], GL_TEXTURE_2D, WGL_ACCESS_READ_ONLY_NV);
+			glBindFramebuffer(GL_FRAMEBUFFER, th.m_glFBO[0]);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, th.m_glTexture[0], 0);
+			int status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+			if (status != GL_FRAMEBUFFER_COMPLETE) {
+				OutputDebugString("Source Framebuffer is not complete\n");
+			}
+
+			// OpenVR can't directly use the format of the shared texture, so we need to make a copy to an additonal texture
+			D3DSURFACE_DESC sd;
+			pIDirect3DTexture9->GetLevelDesc(0, &sd);
+			glBindTexture(GL_TEXTURE_2D, th.m_glTexture[1]);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, sd.Width, sd.Height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+			glBindFramebuffer(GL_FRAMEBUFFER, th.m_glFBO[1]);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, th.m_glTexture[1], 0);
+			status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+			if (status != GL_FRAMEBUFFER_COMPLETE) {
+				OutputDebugString("Target Framebuffer is not complete\n");
+			}
+
+			th.m_Width = sd.Width;
+			th.m_Height = sd.Height;
+			th.m_glDXDevice = m_glDXDevice;
+			th.m_VRTexture.handle = (void*)th.m_glTexture[1];
+			th.m_VRTexture.eColorSpace = vr::ColorSpace_Auto;
+			th.m_VRTexture.eType = vr::TextureType_OpenGL;
 	}
 }
 

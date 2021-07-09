@@ -1,13 +1,15 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <LocalDebuggerCommand>D:\Program Files (x86)\Steam\SteamApps\common\Source SDK Base 2013 Singleplayer\hl2.exe</LocalDebuggerCommand>
+    <LocalDebuggerCommand>G:\Steam\steamapps\common\Half-Life 2 VR\hl2.exe</LocalDebuggerCommand>
     <LocalDebuggerCommandArguments>-w 1280 -h 720 -novid -condebug -processheap -windowed -tickrate 90 -high -refresh 0 -noasserts -nominidumps -hushasserts -dxlevel 98 -game hlvr -steam</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerWorkingDirectory>G:\Steam\steamapps\common\Half-Life 2 VR</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <LocalDebuggerCommand>D:\Program Files (x86)\Steam\SteamApps\common\Source SDK Base 2013 Singleplayer\hl2.exe</LocalDebuggerCommand>
+    <LocalDebuggerCommand>G:\Steam\steamapps\common\Half-Life 2 VR\hl2.exe</LocalDebuggerCommand>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerCommandArguments>-w 1280 -h 720 -novid -condebug -processheap -windowed -tickrate 90 -high -refresh 0 -noasserts -nominidumps -hushasserts -dxlevel 98 -game hlvr -steam</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>G:\Steam\steamapps\common\Half-Life 2 VR</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
 </Project>

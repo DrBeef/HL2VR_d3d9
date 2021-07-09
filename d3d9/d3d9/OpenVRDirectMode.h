@@ -7,6 +7,8 @@
 
 #include "HMDInterface.h"
 #include "OpenVRHelpers\openvr.h"
+#include "glad/glad.h"
+#include "glad/glad_wgl.h"
 
 #include "stCommon.h"
 
@@ -17,7 +19,8 @@ struct IDirect3DDevice9Ex;
 struct SharedTextureHolder {
 	SharedTextureHolder() :
 		m_d3d11Texture(NULL),
-		m_d3d9Texture(NULL) {}
+		m_d3d9Texture(NULL),
+		m_glSharedHandle(NULL) {}
 
 	void Release() {
 		if (m_d3d11Texture != NULL)
@@ -27,12 +30,25 @@ struct SharedTextureHolder {
 			m_d3d9Texture->Release();
 			m_d3d9Texture = NULL;
 		}
+		if (m_glSharedHandle != nullptr)
+		{
+			wglDXUnregisterObjectNV(m_glDXDevice, m_glSharedHandle);
+			glDeleteTextures(2, m_glTexture);
+			glDeleteFramebuffers(2, m_glFBO);
+			m_glSharedHandle = nullptr;
+		}
 	}
 
 	vr::VRVulkanTextureData_t m_VulkanData;
 	ID3D11Texture2D*        m_d3d11Texture;
 	IDirect3DTexture9*      m_d3d9Texture;
 	vr::Texture_t			m_VRTexture;
+
+	GLuint					m_glTexture[2];
+	GLuint					m_glFBO[2];
+	HANDLE					m_glSharedHandle;
+	HANDLE					m_glDXDevice;
+	GLuint					m_Width, m_Height;
 };
 
 struct ButtonState {
@@ -85,6 +101,9 @@ private:
 private:
 	IDirect3DDevice9Ex*		m_pActualDevice;
 	ID3D11Device*			m_pID3D11Device;
+	HDC						m_glDC;
+	HGLRC					m_glContext;
+	HANDLE					m_glDXDevice;
 
 	SharedTextureHolder			m_SharedTextureHolder[5];
 

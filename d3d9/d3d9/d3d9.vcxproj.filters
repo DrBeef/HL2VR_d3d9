@@ -19,6 +19,8 @@
     <ClCompile Include="jsoncpp-0.y.z\jsoncpp.cpp">
       <Filter>jsoncpp-0.y.z</Filter>
     </ClCompile>
+    <ClCompile Include="glad.c" />
+    <ClCompile Include="glad_wgl.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="OpenVRDirectMode.h" />
