@@ -72,6 +72,8 @@ HRESULT WINAPI Direct3DDevice9ExProxyImpl::CreateTexture(UINT Width,UINT Height,
 		Height = rtHeight;
 	}
 
+	if (index != -1)
+		Pool = D3DPOOL_DEFAULT;
 	HRESULT creationResult = Direct3DDevice9ExWrapper::CreateTexture(Width, Height, Levels, Usage, Format, Pool, ppTexture, pSharedHandle);
 
 	if (index != -1)

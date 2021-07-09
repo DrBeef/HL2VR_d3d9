@@ -21,7 +21,7 @@ HRESULT WINAPI Direct3D9ExProxyImpl::CreateDevice(UINT Adapter, D3DDEVTYPE Devic
 	IDirect3DDevice9 *pDirect3DDevice9 = NULL;
 	IDirect3DDevice9Ex *pDirect3DDevice9Ex = NULL;
 
-	hResult = Direct3D9ExWrapper::CreateDevice(Adapter, DeviceType, hFocusWindow, BehaviorFlags, pPresentationParameters, &pDirect3DDevice9);
+	hResult = Direct3D9ExWrapper::CreateDevice(Adapter, DeviceType, hFocusWindow, BehaviorFlags | D3DCREATE_MULTITHREADED, pPresentationParameters, &pDirect3DDevice9);
 
 	if (pDirect3DDevice9)
 	{
@@ -57,7 +57,7 @@ HRESULT WINAPI Direct3D9ExProxyImpl::CreateDeviceEx(UINT Adapter,D3DDEVTYPE Devi
 	HRESULT hResult = S_OK;
 	IDirect3DDevice9Ex *pDirect3DDevice9Ex = NULL;
 
-	hResult = Direct3D9ExWrapper::CreateDeviceEx(Adapter, DeviceType, hFocusWindow, BehaviorFlags, pPresentationParameters, pFullscreenDisplayMode, &pDirect3DDevice9Ex);
+	hResult = Direct3D9ExWrapper::CreateDeviceEx(Adapter, DeviceType, hFocusWindow, BehaviorFlags | D3DCREATE_MULTITHREADED, pPresentationParameters, pFullscreenDisplayMode, &pDirect3DDevice9Ex);
 	if(FAILED(hResult))
 	{
 		DEBUG_LOG("No Direct3DDevice9 Created\n");

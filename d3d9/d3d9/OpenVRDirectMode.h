@@ -4,6 +4,8 @@
 #pragma warning (disable : 4005)
 
 #include <d3d11.h>
+#include <string>
+#include <cstdint>
 
 #include "HMDInterface.h"
 #include "OpenVRHelpers\openvr.h"
