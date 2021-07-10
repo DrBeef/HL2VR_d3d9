@@ -5,6 +5,8 @@
 #include "Direct3DDevice9ExProxyImpl.h"
 #include <DirectXMath.h>
 
+
+#include "GlShaders.h"
 #include "glad/glad.h"
 #include "glad/glad_wgl.h"
 
@@ -77,7 +79,6 @@ OpenVRDirectMode::~OpenVRDirectMode()
 	DEBUG_LOG("OpenVRDirectMode::~OpenVRDirectMode()");
 	if (m_initialised && m_glContext) {
 		wglDXCloseDeviceNV(m_glDXDevice);
-		wglMakeCurrent(NULL, NULL);
 		wglDeleteContext(m_glContext);
 	}
 }
@@ -141,7 +142,7 @@ bool OpenVRDirectMode::Init(IDirect3DDevice9Ex* pActualDevice)
 		PIXELFORMATDESCRIPTOR pfd = {
 			sizeof(PIXELFORMATDESCRIPTOR),
 			1,
-			PFD_SUPPORT_OPENGL|PFD_DRAW_TO_WINDOW|PFD_DOUBLEBUFFER_DONTCARE,
+			PFD_SUPPORT_OPENGL|PFD_DRAW_TO_WINDOW|PFD_DOUBLEBUFFER,
 			PFD_TYPE_RGBA,
 			32,
 			0, 0, 0, 0, 0, 0,
@@ -160,6 +161,23 @@ bool OpenVRDirectMode::Init(IDirect3DDevice9Ex* pActualDevice)
 		}
 
 		wglMakeCurrent(m_glDC, m_glContext);
+		if (!gladLoadWGL(m_glDC)) {
+			OutputDebugString("ERROR: Could not initialize GLAD\n");
+			return false;
+		}
+		wglDeleteContext(m_glContext);
+		int attribs[] = {
+			WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
+			WGL_CONTEXT_MINOR_VERSION_ARB, 3,
+			WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
+			0
+		};
+		m_glContext = wglCreateContextAttribsARB(m_glDC, NULL, attribs);
+		if (!m_glContext) {
+			OutputDebugString("ERROR: Could not create GL context\n");
+			return false;
+		}
+		wglMakeCurrent(m_glDC, m_glContext);
 		if (!gladLoadWGL(m_glDC) || !gladLoadGL()) {
 			OutputDebugString("ERROR: Could not initialize GLAD\n");
 			return false;
@@ -170,6 +188,44 @@ bool OpenVRDirectMode::Init(IDirect3DDevice9Ex* pActualDevice)
 			OutputDebugString("ERROR: Could not open DX device for GL sharing\n");
 			return false;
 		}
+
+		// prepare the shaders
+		GLuint vertex = glCreateShader(GL_VERTEX_SHADER);
+		glShaderSource(vertex, 1, &g_VertexSource, nullptr);
+		glCompileShader(vertex);
+		GLuint fragment = glCreateShader(GL_FRAGMENT_SHADER);
+		glShaderSource(fragment, 1, &g_FragmentSource, nullptr);
+		glCompileShader(fragment);
+		int success;
+		glGetShaderiv(fragment, GL_COMPILE_STATUS, &success);
+		if (!success) {
+			OutputDebugString("ERROR: Could not compile GL fragment shader\n");
+			return false;
+		}
+		m_glProgram = glCreateProgram();
+		glAttachShader(m_glProgram, vertex);
+		glAttachShader(m_glProgram, fragment);
+		glLinkProgram(m_glProgram);
+		glGetProgramiv(m_glProgram, GL_LINK_STATUS, &success);
+		if (!success) {
+			OutputDebugString("ERROR: Could not link GL shader\n");
+			return false;
+		}
+		int uniform = glGetUniformLocation(m_glProgram, "sourceTex");
+		glUniform1i(uniform, 0);
+		glDeleteShader(vertex);
+		glDeleteShader(fragment);
+
+		// bind a dummy VAO, otherwise rendering commands will fail
+		GLuint vao;
+		glGenVertexArrays(1, &vao);
+		glBindVertexArray(vao);
+
+		// common setup
+		glDisable(GL_DEPTH_TEST);
+		glDisable(GL_CULL_FACE);
+		glActiveTexture(GL_TEXTURE0);
+		glUseProgram(m_glProgram);
 	}
 
 	m_initialised = true;
@@ -212,44 +268,14 @@ void OpenVRDirectMode::Submit()
 	{
 		if (m_SharedTextureHolder[m_currentRenderTexture].m_glSharedHandle)
 		{
-			int error = 0;
 			wglDXLockObjectsNV(m_glDXDevice, 1, &m_SharedTextureHolder[m_currentRenderTexture].m_glSharedHandle);
 
-			glBindFramebuffer(GL_FRAMEBUFFER, m_SharedTextureHolder[m_currentRenderTexture].m_glFBO[1]);
-			error = glGetError();
+			glBindFramebuffer(GL_FRAMEBUFFER, m_SharedTextureHolder[m_currentRenderTexture].m_glFBO);
 			GLuint width = m_SharedTextureHolder[m_currentRenderTexture].m_Width;
 			GLuint height = m_SharedTextureHolder[m_currentRenderTexture].m_Height;
 			glViewport(0, 0, width, height);
-			error = glGetError();
-			glMatrixMode(GL_PROJECTION);
-			error = glGetError();
-			glLoadIdentity();
-			error = glGetError();
-			glOrtho(0, width, height, 0, -1, 1);
-			error = glGetError();
-			glDisable(GL_DEPTH_TEST);
-			error = glGetError();
-			glMatrixMode(GL_MODELVIEW);
-			error = glGetError();
-			glLoadIdentity();
-			error = glGetError();
-			glEnable(GL_TEXTURE_2D);
-			error = glGetError();
-			glActiveTexture(GL_TEXTURE0);
-			error = glGetError();
 			glBindTexture(GL_TEXTURE_2D, m_SharedTextureHolder[m_currentRenderTexture].m_glTexture[0]);
-			error = glGetError();
-			glPushMatrix();
-			error = glGetError();
-			glBegin(GL_QUADS);
-			glTexCoord2d(0, 0); glVertex2f(0, 0);
-			glTexCoord2d(0, 1); glVertex2f(0, height);
-			glTexCoord2d(1, 1); glVertex2f(width, height);
-			glTexCoord2d(1, 0); glVertex2f(width, 0);
-			glEnd();
-			error = glGetError();
-			glPopMatrix();
-			error = glGetError();
+			glDrawArrays(GL_TRIANGLES, 0, 3);
 			
 			wglDXUnlockObjectsNV(m_glDXDevice, 1, &m_SharedTextureHolder[m_currentRenderTexture].m_glSharedHandle);
 		}
@@ -531,26 +557,24 @@ void OpenVRDirectMode::StoreSharedTexture(int index, IDirect3DTexture9* pIDirect
 		{
 			SharedTextureHolder &th = m_SharedTextureHolder[m_nextStoredTexture];
 			glGenTextures(2, th.m_glTexture);
-			glGenFramebuffers(2, th.m_glFBO);
+			glGenFramebuffers(1, &th.m_glFBO);
 
 			// get shared texture handle from DX texture
 			wglDXSetResourceShareHandleNV(pIDirect3DTexture9, *pShared);
-			th.m_glSharedHandle = wglDXRegisterObjectNV(m_glDXDevice, pIDirect3DTexture9, th.m_glTexture[0], GL_TEXTURE_2D, WGL_ACCESS_READ_ONLY_NV);
-			glBindFramebuffer(GL_FRAMEBUFFER, th.m_glFBO[0]);
-			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, th.m_glTexture[0], 0);
-			int status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-			if (status != GL_FRAMEBUFFER_COMPLETE) {
-				OutputDebugString("Source Framebuffer is not complete\n");
-			}
+			th.m_glSharedHandle = wglDXRegisterObjectNV(m_glDXDevice, pIDirect3DTexture9, th.m_glTexture[0], GL_TEXTURE_2D, WGL_ACCESS_READ_WRITE_NV);
 
 			// OpenVR can't directly use the format of the shared texture, so we need to make a copy to an additonal texture
 			D3DSURFACE_DESC sd;
 			pIDirect3DTexture9->GetLevelDesc(0, &sd);
 			glBindTexture(GL_TEXTURE_2D, th.m_glTexture[1]);
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, sd.Width, sd.Height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-			glBindFramebuffer(GL_FRAMEBUFFER, th.m_glFBO[1]);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			glBindFramebuffer(GL_FRAMEBUFFER, th.m_glFBO);
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, th.m_glTexture[1], 0);
-			status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+			GLenum drawBuffers[1] = {GL_COLOR_ATTACHMENT0};
+			glDrawBuffers(1, drawBuffers);
+			int status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 			if (status != GL_FRAMEBUFFER_COMPLETE) {
 				OutputDebugString("Target Framebuffer is not complete\n");
 			}
@@ -561,6 +585,9 @@ void OpenVRDirectMode::StoreSharedTexture(int index, IDirect3DTexture9* pIDirect
 			th.m_VRTexture.handle = (void*)th.m_glTexture[1];
 			th.m_VRTexture.eColorSpace = vr::ColorSpace_Auto;
 			th.m_VRTexture.eType = vr::TextureType_OpenGL;
+			//DX9 Texture
+			th.m_d3d9Texture = pIDirect3DTexture9;
+			pIDirect3DTexture9->AddRef();
 	}
 }
 

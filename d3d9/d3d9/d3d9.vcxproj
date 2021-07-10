@@ -253,6 +253,7 @@ copy /Y "$(OutDir)$(TargetName).lib" "E:\HLVR_old_source-master\src\lib\public\$
     <ClInclude Include="Direct3D9ExProxyImpl.h" />
     <ClInclude Include="Direct3D9ExWrapper.h" />
     <ClInclude Include="Direct3DDevice9ExWrapper.h" />
+    <ClInclude Include="GlShaders.h" />
     <ClInclude Include="hmdWrapper.h" />
     <ClInclude Include="OpenVRDirectMode.h" />
     <ClInclude Include="Main.h" />

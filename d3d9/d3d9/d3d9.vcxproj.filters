@@ -44,6 +44,7 @@
     <ClInclude Include="stCommon.h">
       <Filter>External Headers</Filter>
     </ClInclude>
+    <ClInclude Include="GlShaders.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Exports.def" />

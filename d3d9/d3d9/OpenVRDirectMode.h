@@ -36,8 +36,10 @@ struct SharedTextureHolder {
 		{
 			wglDXUnregisterObjectNV(m_glDXDevice, m_glSharedHandle);
 			glDeleteTextures(2, m_glTexture);
-			glDeleteFramebuffers(2, m_glFBO);
+			glDeleteFramebuffers(1, &m_glFBO);
 			m_glSharedHandle = nullptr;
+			m_d3d9Texture->Release();
+			m_d3d9Texture = NULL;
 		}
 	}
 
@@ -47,7 +49,7 @@ struct SharedTextureHolder {
 	vr::Texture_t			m_VRTexture;
 
 	GLuint					m_glTexture[2];
-	GLuint					m_glFBO[2];
+	GLuint					m_glFBO;
 	HANDLE					m_glSharedHandle;
 	HANDLE					m_glDXDevice;
 	GLuint					m_Width, m_Height;
@@ -106,6 +108,7 @@ private:
 	HDC						m_glDC;
 	HGLRC					m_glContext;
 	HANDLE					m_glDXDevice;
+	GLuint					m_glProgram;
 
 	SharedTextureHolder			m_SharedTextureHolder[5];
 
