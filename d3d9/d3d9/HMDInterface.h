@@ -16,8 +16,6 @@ public:
 
 	virtual bool Init(IDirect3DDevice9Ex* pDevice) = 0;
 
-	virtual std::string  GetAPI() = 0;
-
 	//Rendering Stuff
 	virtual void PrePresent() = 0;
 	virtual void Submit() = 0;

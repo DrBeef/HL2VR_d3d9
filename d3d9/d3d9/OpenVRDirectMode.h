@@ -51,8 +51,6 @@ public:
 
 	virtual bool Init(IDirect3DDevice9Ex* pDevice);	
 
-	virtual std::string  GetAPI();
-
 	//Rendering Stuff
 	virtual void PrePresent();
 	virtual void Submit();
@@ -94,11 +92,8 @@ private:
 	uint32_t m_nRenderHeight;
 
 	vr::IVRSystem *m_pHMD;
-	vr::IVRRenderModels *m_pRenderModels;
 	vr::TrackedDevicePose_t m_rTrackedDevicePose[vr::k_unMaxTrackedDeviceCount];
 	
-	char m_rDevClassChar[vr::k_unMaxTrackedDeviceCount];
-
 private:
 	bool m_initialised;
 	int m_nextStoredTexture;

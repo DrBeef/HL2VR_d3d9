@@ -63,24 +63,9 @@ HRESULT WINAPI Direct3DDevice9ExProxyImpl::CreateTexture(UINT Width,UINT Height,
 		//Double width for both eyes
 		rtWidth *= 2;
 
-		if (GetBoolProperty("acquireSharedTextures", true))
-		{
-			index = Width - MAGIC_WIDTH;
+		index = Width - MAGIC_WIDTH;
 
-			if (hmdInterface->GetAPI() == "vulkan")
-			{
-				vr::VRVulkanTextureData_t *pVRVulkanTextureData_t = new vr::VRVulkanTextureData_t();
-				memset(pVRVulkanTextureData_t, 0, sizeof(vr::VRVulkanTextureData_t));
-
-				//Set these here to indicate to DXVK this is a texture data object (a little hacky, but does the trick)
-				pVRVulkanTextureData_t->m_nHeight = rtHeight;
-				pVRVulkanTextureData_t->m_nWidth = rtWidth;
-
-				shared_handle = pVRVulkanTextureData_t;
-			}
-
-			pSharedHandle = &shared_handle;
-		}
+		pSharedHandle = &shared_handle;
 
 		//Update to actual render target size 
 		Width = rtWidth;
@@ -92,13 +77,6 @@ HRESULT WINAPI Direct3DDevice9ExProxyImpl::CreateTexture(UINT Width,UINT Height,
 	if (index != -1)
 	{
 		hmdInterface->StoreSharedTexture(index, *ppTexture, pSharedHandle);
-
-		//Clean up allocated memory
-		if (hmdInterface->GetAPI() == "vulkan")
-		{
-			vr::VRVulkanTextureData_t *p = (vr::VRVulkanTextureData_t*)(*pSharedHandle);
-			delete p;
-		}
 	}
 
 	return creationResult;

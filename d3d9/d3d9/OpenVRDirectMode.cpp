@@ -111,7 +111,6 @@ bool OpenVRDirectMode::Init(IDirect3DDevice9Ex* pActualDevice)
 		return false;
 	}
 
-	if (GetAPI() == "DX11")
 	{
 		HRESULT errorCode = D3D11CreateDevice(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, 0,
 			NULL, NULL, D3D11_SDK_VERSION, &m_pID3D11Device, NULL, NULL);
@@ -121,20 +120,10 @@ bool OpenVRDirectMode::Init(IDirect3DDevice9Ex* pActualDevice)
 			return false;
 		}
 	}
-	else if (GetAPI() == "vulkan")
-	{
-		vr::VRCompositor()->SetExplicitTimingMode(vr::VRCompositorTimingMode_Explicit_ApplicationPerformsPostPresentHandoff);
-	}
 
 	m_initialised = true;
 
 	return true;
-}
-
-std::string  OpenVRDirectMode::GetAPI()
-{
-	static auto api = GetStringProperty("api", "vulkan");
-	return api;
 }
 
 void OpenVRDirectMode::PrePresent()
@@ -142,18 +131,6 @@ void OpenVRDirectMode::PrePresent()
 	if (!m_initialised)
 	{
 		return;
-	}
-
-	if (GetAPI() == "vulkan")
-	{
-		if (vr::VRCompositor())
-		{
-			vr::EVRCompositorError error = vr::VRCompositor()->SubmitExplicitTimingData();
-			if (error != vr::VRCompositorError_None)
-			{
-				OutputDebugString("Error - SubmitExplicitTimingData failed\n");
-			}
-		}
 	}
 }
 
@@ -168,7 +145,6 @@ void OpenVRDirectMode::Submit()
 	static vr::VRTextureBounds_t leftBounds = { 0.0f, 0.0f, 0.5f, 1.0f };
 	static vr::VRTextureBounds_t rightBounds = { 0.5f, 0.0f, 1.0f, 1.0f };
 
-	if (GetAPI() == "DX11")
 	{
 		//Wait for the work to finish
 		IDirect3DQuery9* pEventQuery = nullptr;
@@ -429,7 +405,6 @@ void OpenVRDirectMode::StoreSharedTexture(int index, IDirect3DTexture9* pIDirect
 
 	if (m_hasHMDAttached)
 	{
-		if (GetAPI() == "DX11")
 		{
 			ID3D11Resource* pID3D11Resource = NULL;
 			if (SUCCEEDED(m_pID3D11Device->OpenSharedResource(*pShared, __uuidof(ID3D11Resource), (void**)&pID3D11Resource)))
@@ -452,14 +427,6 @@ void OpenVRDirectMode::StoreSharedTexture(int index, IDirect3DTexture9* pIDirect
 
 				pID3D11Resource->Release();
 			}
-		}
-		else if (GetAPI() == "vulkan")
-		{
-			memcpy(&m_SharedTextureHolder[m_nextStoredTexture].m_VulkanData, *pShared, sizeof(vr::VRVulkanTextureData_t));
-
-			m_SharedTextureHolder[m_nextStoredTexture].m_VRTexture.handle = &m_SharedTextureHolder[m_nextStoredTexture].m_VulkanData;
-			m_SharedTextureHolder[m_nextStoredTexture].m_VRTexture.eColorSpace = vr::ColorSpace_Auto;
-			m_SharedTextureHolder[m_nextStoredTexture].m_VRTexture.eType = vr::TextureType_Vulkan;
 		}
 	}
 }
