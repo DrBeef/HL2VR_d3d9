@@ -126,16 +126,6 @@ bool OpenVRDirectMode::Init(IDirect3DDevice9Ex* pActualDevice)
 	}
 
 	{
-		HRESULT errorCode = D3D11CreateDevice(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, 0,
-			NULL, NULL, D3D11_SDK_VERSION, &m_pID3D11Device, NULL, NULL);
-
-		if (FAILED(errorCode))
-		{
-			return false;
-		}
-	}
-	else if (GetAPI() == "opengl") 
-	{
 		D3DDEVICE_CREATION_PARAMETERS params;
 		m_pActualDevice->GetCreationParameters(&params);
 		m_glDC = GetDC(params.hFocusWindow);
@@ -252,19 +242,6 @@ void OpenVRDirectMode::Submit()
 	static vr::VRTextureBounds_t leftBounds = { 0.0f, 0.0f, 0.5f, 1.0f };
 	static vr::VRTextureBounds_t rightBounds = { 0.5f, 0.0f, 1.0f, 1.0f };
 
-	{
-		//Wait for the work to finish
-		IDirect3DQuery9* pEventQuery = nullptr;
-		m_pActualDevice->CreateQuery(D3DQUERYTYPE_EVENT, &pEventQuery);
-		if (pEventQuery != nullptr)
-		{
-			pEventQuery->Issue(D3DISSUE_END);
-			while (pEventQuery->GetData(nullptr, 0, D3DGETDATA_FLUSH) != S_OK);
-			pEventQuery->Release();
-		}
-	}
-
-	if (GetAPI() == "opengl")
 	{
 		if (m_SharedTextureHolder[m_currentRenderTexture].m_glSharedHandle)
 		{
@@ -529,65 +506,39 @@ void OpenVRDirectMode::StoreSharedTexture(int index, IDirect3DTexture9* pIDirect
 
 	if (m_hasHMDAttached)
 	{
-		{
-			ID3D11Resource* pID3D11Resource = NULL;
-			if (SUCCEEDED(m_pID3D11Device->OpenSharedResource(*pShared, __uuidof(ID3D11Resource), (void**)&pID3D11Resource)))
-			{
-				ID3D11Texture2D *pID3D11Texture2D = NULL;
-				if (SUCCEEDED(pID3D11Resource->QueryInterface(__uuidof(ID3D11Texture2D), (void**)&pID3D11Texture2D)))
-				{
-					//DX11 2D Surface - The QI above would have increased the ref count for this
-					m_SharedTextureHolder[m_nextStoredTexture].m_d3d11Texture = pID3D11Texture2D;
+		SharedTextureHolder &th = m_SharedTextureHolder[m_nextStoredTexture];
+		glGenTextures(2, th.m_glTexture);
+		glGenFramebuffers(1, &th.m_glFBO);
 
-					//DX9 Texture
-					m_SharedTextureHolder[m_nextStoredTexture].m_d3d9Texture = pIDirect3DTexture9;
-					pIDirect3DTexture9->AddRef();
+		// get shared texture handle from DX texture
+		wglDXSetResourceShareHandleNV(pIDirect3DTexture9, *pShared);
+		th.m_glSharedHandle = wglDXRegisterObjectNV(m_glDXDevice, pIDirect3DTexture9, th.m_glTexture[0], GL_TEXTURE_2D, WGL_ACCESS_READ_WRITE_NV);
 
-					//Open VR Texture
-					m_SharedTextureHolder[m_nextStoredTexture].m_VRTexture.handle = pID3D11Texture2D;
-					m_SharedTextureHolder[m_nextStoredTexture].m_VRTexture.eColorSpace = vr::ColorSpace_Auto;
-					m_SharedTextureHolder[m_nextStoredTexture].m_VRTexture.eType = vr::TextureType_DirectX;
-				}
-
-				pID3D11Resource->Release();
-			}
+		// OpenVR can't directly use the format of the shared texture, so we need to make a copy to an additonal texture
+		D3DSURFACE_DESC sd;
+		pIDirect3DTexture9->GetLevelDesc(0, &sd);
+		glBindTexture(GL_TEXTURE_2D, th.m_glTexture[1]);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, sd.Width, sd.Height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glBindFramebuffer(GL_FRAMEBUFFER, th.m_glFBO);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, th.m_glTexture[1], 0);
+		GLenum drawBuffers[1] = {GL_COLOR_ATTACHMENT0};
+		glDrawBuffers(1, drawBuffers);
+		int status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+		if (status != GL_FRAMEBUFFER_COMPLETE) {
+			OutputDebugString("Target Framebuffer is not complete\n");
 		}
-		}
-		else if (GetAPI() == "opengl")
-		{
-			SharedTextureHolder &th = m_SharedTextureHolder[m_nextStoredTexture];
-			glGenTextures(2, th.m_glTexture);
-			glGenFramebuffers(1, &th.m_glFBO);
 
-			// get shared texture handle from DX texture
-			wglDXSetResourceShareHandleNV(pIDirect3DTexture9, *pShared);
-			th.m_glSharedHandle = wglDXRegisterObjectNV(m_glDXDevice, pIDirect3DTexture9, th.m_glTexture[0], GL_TEXTURE_2D, WGL_ACCESS_READ_WRITE_NV);
-
-			// OpenVR can't directly use the format of the shared texture, so we need to make a copy to an additonal texture
-			D3DSURFACE_DESC sd;
-			pIDirect3DTexture9->GetLevelDesc(0, &sd);
-			glBindTexture(GL_TEXTURE_2D, th.m_glTexture[1]);
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, sd.Width, sd.Height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-			glBindFramebuffer(GL_FRAMEBUFFER, th.m_glFBO);
-			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, th.m_glTexture[1], 0);
-			GLenum drawBuffers[1] = {GL_COLOR_ATTACHMENT0};
-			glDrawBuffers(1, drawBuffers);
-			int status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-			if (status != GL_FRAMEBUFFER_COMPLETE) {
-				OutputDebugString("Target Framebuffer is not complete\n");
-			}
-
-			th.m_Width = sd.Width;
-			th.m_Height = sd.Height;
-			th.m_glDXDevice = m_glDXDevice;
-			th.m_VRTexture.handle = (void*)th.m_glTexture[1];
-			th.m_VRTexture.eColorSpace = vr::ColorSpace_Auto;
-			th.m_VRTexture.eType = vr::TextureType_OpenGL;
-			//DX9 Texture
-			th.m_d3d9Texture = pIDirect3DTexture9;
-			pIDirect3DTexture9->AddRef();
+		th.m_Width = sd.Width;
+		th.m_Height = sd.Height;
+		th.m_glDXDevice = m_glDXDevice;
+		th.m_VRTexture.handle = (void*)th.m_glTexture[1];
+		th.m_VRTexture.eColorSpace = vr::ColorSpace_Auto;
+		th.m_VRTexture.eType = vr::TextureType_OpenGL;
+		//DX9 Texture
+		th.m_d3d9Texture = pIDirect3DTexture9;
+		pIDirect3DTexture9->AddRef();
 	}
 }
 

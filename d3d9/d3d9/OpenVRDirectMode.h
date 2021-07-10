@@ -20,18 +20,10 @@ struct IDirect3DDevice9Ex;
 
 struct SharedTextureHolder {
 	SharedTextureHolder() :
-		m_d3d11Texture(NULL),
 		m_d3d9Texture(NULL),
 		m_glSharedHandle(NULL) {}
 
 	void Release() {
-		if (m_d3d11Texture != NULL)
-		{
-			m_d3d11Texture->Release();
-			m_d3d11Texture = NULL;
-			m_d3d9Texture->Release();
-			m_d3d9Texture = NULL;
-		}
 		if (m_glSharedHandle != nullptr)
 		{
 			wglDXUnregisterObjectNV(m_glDXDevice, m_glSharedHandle);
@@ -43,8 +35,6 @@ struct SharedTextureHolder {
 		}
 	}
 
-	vr::VRVulkanTextureData_t m_VulkanData;
-	ID3D11Texture2D*        m_d3d11Texture;
 	IDirect3DTexture9*      m_d3d9Texture;
 	vr::Texture_t			m_VRTexture;
 
